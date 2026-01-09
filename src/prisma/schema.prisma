@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql" 
-  url      = env("DIRECT_URL") 
 }
 
 enum Role {
@@ -15,11 +14,14 @@ enum Role {
 }
 
 enum BusinessCategory {
-  BARBERIA
+  BARBERSHOP
   SPA
-  MECANICA
-  BELLEZA
-  OTRO
+  MECHANIC
+  BEAUTY_SALON
+  GYM
+  WASHING_SERVICE
+  RESTAURANT
+  OTHER
 }
 
 enum AppointmentStatus {
