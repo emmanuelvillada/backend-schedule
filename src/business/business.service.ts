@@ -11,7 +11,7 @@ export class BusinessService {
   }
 
   findAll() {
-    return `This action returns all business`;
+    return this.prisma.business.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async findOne(id: string) {
