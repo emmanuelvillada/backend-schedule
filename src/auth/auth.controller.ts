@@ -12,6 +12,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Public } from './decorators/public.decorator';
 
 interface AuthRequest extends Request {
   user: {
@@ -25,6 +26,7 @@ interface AuthRequest extends Request {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('register')
   async register(
     @Body() dto: RegisterDto,
@@ -35,6 +37,7 @@ export class AuthController {
     return { message: 'Registro exitoso' };
   }
 
+  @Public()
   @Post('login')
   async login(
     @Body() dto: LoginDto,
@@ -45,6 +48,7 @@ export class AuthController {
     return { message: 'Login exitoso' };
   }
 
+  @Public()
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('token');

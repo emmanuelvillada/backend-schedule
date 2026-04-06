@@ -20,7 +20,7 @@ export class BusinessController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'OWNER')
+  @Roles('ADMIN', 'BUSINESS_OWNER')
   create(@Body() createBusinessDto: CreateBusinessDto) {
     return this.businessService.create(createBusinessDto);
   }
@@ -36,6 +36,8 @@ export class BusinessController {
   }
 
   @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'BUSINESS_OWNER')
   update(
     @Param('id') id: string,
     @Body() updateBusinessDto: UpdateBusinessDto,
@@ -44,6 +46,8 @@ export class BusinessController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'BUSINESS_OWNER')
   remove(@Param('id') id: string) {
     return this.businessService.remove(id);
   }
