@@ -3,7 +3,7 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "baseUrl": "./",
-    "ignoreDeprecations": "5.0",
+    "ignoreDeprecations": "6.0",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,

@@ -7,23 +7,20 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    console.log('🔍 DATABASE_URL:', process.env.DATABASE_URL);
+    const url = process.env.DATABASE_URL ?? '';
+    const urlWithSsl = url.includes('sslmode')
+      ? url
+      : url + (url.includes('?') ? '&' : '?') + 'sslmode=require';
+
     super({
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL,
-        },
-      },
+      datasources: { db: { url: urlWithSsl } },
       log: ['error'],
     });
-    // Override SSL para el engine de Prisma
+
+    // Prisma 6: el engine de Rust lee overrideDatasources, no datasources del constructor
     (this as any)._engineConfig = {
       ...(this as any)._engineConfig,
-      overrideDatasources: {
-        db: {
-          url: process.env.DATABASE_URL + '&sslmode=require',
-        },
-      },
+      overrideDatasources: { db: { url: urlWithSsl } },
     };
   }
 
