@@ -51,4 +51,16 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
     };
   }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (!user) {
+      throw new UnauthorizedException(
+        'El correo no pertenece a ningun usuario',
+      );
+    }
+    // Enviar correo con instrucciones para restablecer contraseña
+  }
 }

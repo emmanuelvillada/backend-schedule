@@ -20,7 +20,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   app.enableShutdownHooks();
-  console.log('DIRECT_URL:', process.env.DIRECT_URL);
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

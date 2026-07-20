@@ -61,6 +61,13 @@ export class AuthController {
     return req.user; // Lo que inyecta el JwtStrategy
   }
 
+  @Public()
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: { email: string }) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'Instrucciones para restablecer contraseña enviadas' };
+  }
+
   private setTokenCookie(res: Response, token: string) {
     res.cookie('token', token, {
       httpOnly: true, // No accesible desde JS
