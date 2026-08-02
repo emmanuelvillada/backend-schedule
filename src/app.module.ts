@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { ServicesModule } from './services/services.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { MailService } from './mail/mail.service';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SchedulesModule } from './schedules/schedules.module';
       provide: APP_GUARD,
       useClass: JwtAuthGuard, // Guard global
     },
+    MailService,
   ],
 })
 export class AppModule {}
