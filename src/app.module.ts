@@ -10,6 +10,8 @@ import { ServicesModule } from './services/services.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { MailService } from './mail/mail.service';
+import { ConfigModule } from '@nestjs/config';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -20,6 +22,10 @@ import { MailService } from './mail/mail.service';
     ServicesModule,
     SchedulesModule,
     AppointmentsModule,
+    MailModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
   ],
   controllers: [AppController],
   providers: [

@@ -4,12 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -61,6 +63,12 @@ export class AuthService {
         'El correo no pertenece a ningun usuario',
       );
     }
-    // Enviar correo con instrucciones para restablecer contraseña
+    const resetToken = this.jwtService.sign(
+      { sub: user.id, email: user.email },
+      { expiresIn: '1h' },
+    );
+    await this.mailService.sendResetPasswordEmail(user.email, resetToken);
+
+    return user;
   }
 }
