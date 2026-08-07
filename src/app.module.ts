@@ -12,6 +12,7 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { MailService } from './mail/mail.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailModule } from './mail/mail.module';
+import Joi, * as joi from 'joi';
 
 @Module({
   imports: [
@@ -25,6 +26,11 @@ import { MailModule } from './mail/mail.module';
     MailModule,
     ConfigModule.forRoot({
       isGlobal: true,
+      validationSchema: Joi.object({
+        RESEND_API_KEY: Joi.string().required(),
+        MAIL_FROM: Joi.string().required(),
+        FRONTEND_URL: Joi.string().uri().required(),
+      }),
     }),
   ],
   controllers: [AppController],
