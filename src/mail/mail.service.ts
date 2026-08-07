@@ -9,8 +9,8 @@ import { Resend } from 'resend';
 export interface SendEmailOptions {
   to: string;
   subject: string;
+  html: string;
   text?: string;
-  html?: string;
 }
 
 @Injectable()
