@@ -1,10 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-  Logger,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -30,28 +24,16 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
-    try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          password: hashedPassword,
-          name: dto.name,
-          role: 'USER', // el rol NUNCA se toma del cliente en el registro público
-        },
-      });
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        password: hashedPassword,
+        name: dto.name,
+        role: dto.role,
+      },
+    });
 
-      return this.signToken(user.id, user.email, user.role);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('El correo ya está registrado.');
-      }
-
-      this.logger.error('Error inesperado al registrar usuario', error);
-      throw error;
-    }
+    return this.signToken(user.id, user.email, user.role);
   }
 
   async login(dto: LoginDto) {
