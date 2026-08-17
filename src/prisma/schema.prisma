@@ -17,7 +17,7 @@ model User {
   role                Role                  @default(CLIENT)
   createdAt           DateTime              @default(now())
   clientAppointments  Appointment[]         @relation("ClientAppointments")
-  ownedBusinesses     Business[]            @relation("OwnerBusinesses")
+  ownedBusiness       Business?             @relation("OwnerBusinesses")
   employeeProfile     Employee?
   passwordResetTokens PasswordResetToken[]
 }
@@ -27,7 +27,7 @@ model Business {
   name         String
   description  String?
   category     BusinessCategory
-  ownerId      String
+  ownerId      String           @unique
   createdAt    DateTime         @default(now())
   appointments Appointment[]
   owner        User             @relation("OwnerBusinesses", fields: [ownerId], references: [id])

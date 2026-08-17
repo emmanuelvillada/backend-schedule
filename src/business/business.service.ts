@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -22,9 +23,30 @@ export class BusinessService {
         ? createBusinessDto.ownerId
         : user.id;
 
-    return await this.prisma.business.create({
-      data: { ...createBusinessDto, ownerId },
+    const existing = await this.prisma.business.findUnique({
+      where: { ownerId },
     });
+    if (existing) {
+      throw new ConflictException(
+        'Este usuario ya tiene un negocio registrado',
+      );
+    }
+
+    try {
+      return await this.prisma.business.create({
+        data: { ...createBusinessDto, ownerId },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Este usuario ya tiene un negocio registrado',
+        );
+      }
+      throw error;
+    }
   }
 
   async findOne(id: string) {
