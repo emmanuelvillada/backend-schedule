@@ -13,6 +13,7 @@ import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('schedules')
 export class SchedulesController {
@@ -62,6 +63,7 @@ export class SchedulesController {
 
   // ─── Availability ─────────────────────────────────────────────────
 
+  @Public()
   @Get('availability/:businessId')
   getAvailableSlots(
     @Param('businessId') businessId: string,

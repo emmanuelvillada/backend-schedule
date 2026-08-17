@@ -12,6 +12,8 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { AuthUser } from 'src/auth/types/auth-user.type';
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -27,15 +29,21 @@ export class AppointmentsController {
   @Get('business/:businessId')
   @UseGuards(RolesGuard)
   @Roles('BUSINESS_OWNER', 'EMPLOYEE', 'ADMIN')
-  findAllByBusiness(@Param('businessId') businessId: string) {
-    return this.appointmentsService.findAllByBusiness(businessId);
+  findAllByBusiness(
+    @Param('businessId') businessId: string,
+    @GetUser() user: AuthUser,
+  ) {
+    return this.appointmentsService.findAllByBusiness(businessId, user);
   }
 
   @Get('client/:clientId')
   @UseGuards(RolesGuard)
   @Roles('CLIENT', 'ADMIN')
-  findAllByClient(@Param('clientId') clientId: string) {
-    return this.appointmentsService.findAllByClient(clientId);
+  findAllByClient(
+    @Param('clientId') clientId: string,
+    @GetUser() user: AuthUser,
+  ) {
+    return this.appointmentsService.findAllByClient(clientId, user);
   }
 
   @Get(':id')

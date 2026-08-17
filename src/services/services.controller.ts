@@ -13,6 +13,7 @@ import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('services')
 export class ServicesController {
@@ -25,11 +26,13 @@ export class ServicesController {
     return this.servicesService.create(dto);
   }
 
+  @Public()
   @Get('business/:businessId')
   findAllByBusiness(@Param('businessId') businessId: string) {
     return this.servicesService.findAllByBusiness(businessId);
   }
 
+  @Public()
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.servicesService.findOne(id);

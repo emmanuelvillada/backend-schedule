@@ -20,6 +20,7 @@ model User {
   ownedBusiness       Business?             @relation("OwnerBusinesses")
   employeeProfile     Employee?
   passwordResetTokens PasswordResetToken[]
+  reviews             Review[]              @relation("ClientReviews")
 }
 
 model Business {
@@ -28,12 +29,15 @@ model Business {
   description  String?
   category     BusinessCategory
   ownerId      String           @unique
+  latitude     Float?
+  longitude    Float?
   createdAt    DateTime         @default(now())
   appointments Appointment[]
   owner        User             @relation("OwnerBusinesses", fields: [ownerId], references: [id])
   employees    Employee[]
   schedules    Schedule[]
   services     Service[]
+  reviews      Review[]
 }
 
 model Service {
@@ -92,6 +96,22 @@ model Appointment {
   client     User                 @relation("ClientAppointments", fields: [clientId], references: [id])
   employee   Employee?            @relation(fields: [employeeId], references: [id])
   services   AppointmentService[]
+  review     Review?
+}
+
+model Review {
+  id            String      @id @default(uuid())
+  rating        Int
+  comment       String?
+  createdAt     DateTime    @default(now())
+  businessId    String
+  business      Business    @relation(fields: [businessId], references: [id])
+  clientId      String
+  client        User        @relation("ClientReviews", fields: [clientId], references: [id])
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([businessId])
 }
 
 model AppointmentService {

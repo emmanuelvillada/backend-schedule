@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
+import { AuthUser } from 'src/auth/types/auth-user.type';
 
 @Injectable()
 export class AppointmentsService {
@@ -66,7 +68,8 @@ export class AppointmentsService {
     });
   }
 
-  findAllByBusiness(businessId: string) {
+  async findAllByBusiness(businessId: string, user: AuthUser) {
+    await this.ensureBusinessAccess(businessId, user);
     return this.prisma.appointment.findMany({
       where: { businessId },
       include: {
@@ -78,16 +81,48 @@ export class AppointmentsService {
     });
   }
 
-  findAllByClient(clientId: string) {
+  findAllByClient(clientId: string, user: AuthUser) {
+    if (user.role !== 'ADMIN' && user.id !== clientId) {
+      throw new ForbiddenException('No puedes ver las citas de otro cliente');
+    }
     return this.prisma.appointment.findMany({
       where: { clientId },
       include: {
         services: { include: { service: true } },
         business: { select: { id: true, name: true, category: true } },
         employee: { include: { user: { select: { id: true, name: true } } } },
+        review: true,
       },
       orderBy: { startTime: 'desc' },
     });
+  }
+
+  // Verifica que el usuario (dueño, empleado o admin) tenga permiso sobre
+  // las citas de este negocio.
+  private async ensureBusinessAccess(businessId: string, user: AuthUser) {
+    if (user.role === 'ADMIN') return;
+
+    if (user.role === 'BUSINESS_OWNER') {
+      const business = await this.prisma.business.findUnique({
+        where: { id: businessId },
+      });
+      if (!business || business.ownerId !== user.id) {
+        throw new ForbiddenException('No tienes permiso sobre este negocio');
+      }
+      return;
+    }
+
+    if (user.role === 'EMPLOYEE') {
+      const employee = await this.prisma.employee.findUnique({
+        where: { userId: user.id },
+      });
+      if (!employee || employee.businessId !== businessId) {
+        throw new ForbiddenException('No tienes permiso sobre este negocio');
+      }
+      return;
+    }
+
+    throw new ForbiddenException('No tienes permiso sobre este negocio');
   }
 
   async findOne(id: string) {

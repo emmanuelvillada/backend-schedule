@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -22,15 +27,36 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    if (dto.role === 'BUSINESS_OWNER' && !dto.business) {
+      throw new BadRequestException(
+        'Debes completar la información del negocio',
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password: hashedPassword,
-        name: dto.name,
-        role: dto.role,
-      },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email: dto.email,
+          password: hashedPassword,
+          name: dto.name,
+          role: dto.role,
+        },
+      });
+
+      if (dto.role === 'BUSINESS_OWNER' && dto.business) {
+        await tx.business.create({
+          data: {
+            name: dto.business.name,
+            description: dto.business.description,
+            category: dto.business.category,
+            ownerId: newUser.id,
+          },
+        });
+      }
+
+      return newUser;
     });
 
     return this.signToken(user.id, user.email, user.role);
