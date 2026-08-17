@@ -6,7 +6,7 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 export class FindBusinessesQueryDto {
   @IsOptional()
   @IsString()
-  search?: string; // busca en name (y opcional description)
+  search?: string; // busca en name y description
 
   @IsOptional()
   @IsEnum(BusinessCategory)
@@ -14,7 +14,7 @@ export class FindBusinessesQueryDto {
 
   @IsOptional()
   @IsString()
-  city?: string;
+  ownerId?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -28,17 +28,4 @@ export class FindBusinessesQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 10;
-
-  // opcional: geolocalización
-  @IsOptional()
-  @Type(() => Number)
-  lat?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  lng?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  radiusKm?: number = 10;
 }
