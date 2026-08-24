@@ -1,3 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                  String                @id @default(uuid())
+  email               String                @unique
+  password            String
+  name                String
+  phone               String?
+  role                Role                  @default(CLIENT)
+  createdAt           DateTime              @default(now())
+  clientAppointments  Appointment[]         @relation("ClientAppointments")
+  ownedBusiness       Business?             @relation("OwnerBusinesses")
+  employeeProfile     Employee?
+  passwordResetTokens PasswordResetToken[]
+  reviews             Review[]              @relation("ClientReviews")
+}
+
+model Business {
+  id           String           @id @default(uuid())
+  name         String
+  description  String?
+  category     BusinessCategory
+  ownerId      String           @unique
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime         @default(now())
+  appointments Appointment[]
+  owner        User             @relation("OwnerBusinesses", fields: [ownerId], references: [id])
+  employees    Employee[]
+  schedules    Schedule[]
+  services     Service[]
+  reviews      Review[]
+  images       BusinessImage[]
+}
+
+model BusinessImage {
+  id         String   @id @default(uuid())
+  businessId String
+  url        String
+  path       String
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model Service {
+  id           String               @id @default(uuid())
+  name         String
+  durationMin  Int
+  price        Float
+  isActive     Boolean              @default(true)
+  businessId   String
+  appointments AppointmentService[]
+  business     Business             @relation(fields: [businessId], references: [id])
+  employees    Employee[]           @relation("EmployeeToService")
+}
+
+model Schedule {
+  id         String   @id @default(uuid())
+  businessId String
+  dayOfWeek  Int
+  openTime   String
+  closeTime  String
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Employee {
+  id           String             @id @default(uuid())
+  userId       String             @unique
+  businessId   String
+  appointments Appointment[]
+  business     Business           @relation(fields: [businessId], references: [id])
+  user         User               @relation(fields: [userId], references: [id])
+  schedules    EmployeeSchedule[]
+  services     Service[]          @relation("EmployeeToService")
+}
+
+model EmployeeSchedule {
+  id         String   @id @default(uuid())
+  employeeId String
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+}
+
+model Appointment {
+  id         String               @id @default(uuid())
+  startTime  DateTime
+  endTime    DateTime
+  status     AppointmentStatus    @default(PENDING)
+  notes      String?
+  businessId String
+  clientId   String
+  employeeId String?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  business   Business             @relation(fields: [businessId], references: [id])
+  client     User                 @relation("ClientAppointments", fields: [clientId], references: [id])
+  employee   Employee?            @relation(fields: [employeeId], references: [id])
+  services   AppointmentService[]
+  review     Review?
+}
+
+model Review {
+  id            String      @id @default(uuid())
+  rating        Int
+  comment       String?
+  createdAt     DateTime    @default(now())
+  businessId    String
+  business      Business    @relation(fields: [businessId], references: [id])
+  clientId      String
+  client        User        @relation("ClientReviews", fields: [clientId], references: [id])
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([businessId])
+}
+
+model AppointmentService {
+  appointmentId String
+  serviceId     String
+  priceAtTime   Float
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  service       Service     @relation(fields: [serviceId], references: [id])
+
+  @@id([appointmentId, serviceId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 enum Role {
   CLIENT
   BUSINESS_OWNER
@@ -5,69 +156,17 @@ enum Role {
   ADMIN
 }
 
+enum BusinessCategory {
+  BARBERIA
+  SPA
+  MECANICA
+  BELLEZA
+  OTRO
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
-}
-
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  phone     String?
-  role      Role
-  createdAt DateTime @default(now())
-
-  businesses Business[]
-  appointments Appointment[]
-}
-
-model Business {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  category    String
-  ownerId     String
-  owner       User @relation(fields: [ownerId], references: [id])
-
-  services     Service[]
-  schedules    Schedule[]
-  appointments Appointment[]
-}
-
-model Service {
-  id          String @id @default(uuid())
-  name        String
-  durationMin Int
-  price       Float
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id])
-}
-
-model Schedule {
-  id         String @id @default(uuid())
-  businessId String
-  dayOfWeek  Int
-  openTime   String
-  closeTime  String
-
-  business Business @relation(fields: [businessId], references: [id])
-}
-
-model Appointment {
-  id         String @id @default(uuid())
-  startTime  DateTime
-  endTime    DateTime
-  status     AppointmentStatus
-
-  businessId String
-  serviceId  String
-  clientId   String
-
-  business Business @relation(fields: [businessId], references: [id])
-  service  Service  @relation(fields: [serviceId], references: [id])
-  client   User     @relation(fields: [clientId], references: [id])
 }
