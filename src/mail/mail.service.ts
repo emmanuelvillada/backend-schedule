@@ -129,6 +129,31 @@ export class MailService {
     });
   }
 
+  async sendEmployeeInviteEmail(
+    email: string,
+    name: string,
+    businessName: string,
+    token: string,
+  ) {
+    const safeName = escapeHtml(name);
+    const safeBusinessName = escapeHtml(businessName);
+    const url = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(
+      token,
+    )}`;
+
+    return this.sendEmail({
+      to: email,
+      subject: `Te sumaron como empleado de ${businessName}`,
+      html: this.buildLayout(`
+        <h2>Hola ${safeName}</h2>
+        <p>Te agregaron como empleado de <strong>${safeBusinessName}</strong> en Schedule.</p>
+        <p>Haz clic en el siguiente enlace para definir tu contraseña y acceder a tu cuenta:</p>
+        <p><a href="${url}">Definir contraseña</a></p>
+      `),
+      text: `Hola ${name}. Te agregaron como empleado de ${businessName} en Schedule. Define tu contraseña en el siguiente enlace: ${url}`,
+    });
+  }
+
   async sendWelcomeEmail(email: string, name: string) {
     const safeName = escapeHtml(name);
 

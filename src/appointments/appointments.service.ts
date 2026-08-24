@@ -8,10 +8,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { AuthUser } from 'src/auth/types/auth-user.type';
+import { SchedulesService } from 'src/schedules/schedules.service';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly schedulesService: SchedulesService,
+  ) {}
 
   async create(dto: CreateAppointmentDto) {
     // 1. Obtener servicios y calcular duración total
@@ -29,30 +33,18 @@ export class AppointmentsService {
     const startTime = new Date(dto.startTime);
     const endTime = new Date(startTime.getTime() + totalDuration * 60000);
 
-    // 2. Validar que no haya solapamiento en el negocio
-    const conflict = await this.prisma.appointment.findFirst({
-      where: {
-        businessId: dto.businessId,
-        employeeId: dto.employeeId ?? undefined,
-        status: { in: ['PENDING', 'CONFIRMED'] },
-        OR: [{ startTime: { lt: endTime }, endTime: { gt: startTime } }],
-      },
-    });
-
-    if (conflict) {
-      throw new BadRequestException('The selected time slot is not available');
-    }
+    // 2. Resolver con qué trabajador queda la cita (o ninguno, si el
+    // negocio no tiene trabajadores) validando disponibilidad real.
+    const employeeId = await this.resolveEmployee(dto, startTime, endTime);
 
     // 3. Crear appointment con sus servicios
-    //const priceAtTime = services.reduce((sum, s) => sum + s.price, 0);
-
     return this.prisma.appointment.create({
       data: {
         startTime,
         endTime,
         businessId: dto.businessId,
         clientId: dto.clientId,
-        employeeId: dto.employeeId,
+        employeeId,
         services: {
           create: services.map((s) => ({
             serviceId: s.id,
@@ -66,6 +58,72 @@ export class AppointmentsService {
         client: true,
       },
     });
+  }
+
+  // Si el cliente eligió un trabajador, valida que sea de ese negocio y que
+  // esté libre. Si no eligió y el negocio tiene trabajadores, le asigna
+  // automáticamente uno disponible. Si el negocio no tiene trabajadores,
+  // conserva el comportamiento original (chequeo a nivel de todo el negocio).
+  private async resolveEmployee(
+    dto: CreateAppointmentDto,
+    startTime: Date,
+    endTime: Date,
+  ): Promise<string | null> {
+    if (dto.employeeId) {
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: dto.employeeId },
+      });
+      if (!employee || employee.businessId !== dto.businessId) {
+        throw new BadRequestException(
+          'El trabajador seleccionado no pertenece a este negocio',
+        );
+      }
+
+      const conflict = await this.prisma.appointment.findFirst({
+        where: {
+          employeeId: dto.employeeId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          OR: [{ startTime: { lt: endTime }, endTime: { gt: startTime } }],
+        },
+      });
+      if (conflict) {
+        throw new BadRequestException(
+          'The selected time slot is not available',
+        );
+      }
+      return dto.employeeId;
+    }
+
+    const employeeCount = await this.prisma.employee.count({
+      where: { businessId: dto.businessId },
+    });
+
+    if (employeeCount === 0) {
+      const conflict = await this.prisma.appointment.findFirst({
+        where: {
+          businessId: dto.businessId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          OR: [{ startTime: { lt: endTime }, endTime: { gt: startTime } }],
+        },
+      });
+      if (conflict) {
+        throw new BadRequestException(
+          'The selected time slot is not available',
+        );
+      }
+      return null;
+    }
+
+    const availableEmployeeId =
+      await this.schedulesService.findAvailableEmployee(
+        dto.businessId,
+        startTime,
+        endTime,
+      );
+    if (!availableEmployeeId) {
+      throw new BadRequestException('The selected time slot is not available');
+    }
+    return availableEmployeeId;
   }
 
   async findAllByBusiness(businessId: string, user: AuthUser) {

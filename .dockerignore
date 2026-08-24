@@ -1,0 +1,14 @@
+node_modules
+dist
+generated
+coverage
+.git
+.gitignore
+.env
+.env.*
+*.log
+.vscode
+.idea
+postman
+test
+*.md

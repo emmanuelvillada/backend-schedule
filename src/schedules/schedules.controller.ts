@@ -14,6 +14,8 @@ import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { AuthUser } from 'src/auth/types/auth-user.type';
 
 @Controller('schedules')
 export class SchedulesController {
@@ -24,10 +26,14 @@ export class SchedulesController {
   @Post('business')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'BUSINESS_OWNER')
-  createBusinessSchedule(@Body() dto: CreateScheduleDto) {
-    return this.schedulesService.createBusinessSchedule(dto);
+  createBusinessSchedule(
+    @Body() dto: CreateScheduleDto,
+    @GetUser() user: AuthUser,
+  ) {
+    return this.schedulesService.createBusinessSchedule(dto, user);
   }
 
+  @Public()
   @Get('business/:businessId')
   getBusinessSchedules(@Param('businessId') businessId: string) {
     return this.schedulesService.getBusinessSchedules(businessId);
@@ -36,8 +42,8 @@ export class SchedulesController {
   @Delete('business/:id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'BUSINESS_OWNER')
-  removeBusinessSchedule(@Param('id') id: string) {
-    return this.schedulesService.removeBusinessSchedule(id);
+  removeBusinessSchedule(@Param('id') id: string, @GetUser() user: AuthUser) {
+    return this.schedulesService.removeBusinessSchedule(id, user);
   }
 
   // ─── Employee ─────────────────────────────────────────────────────
@@ -45,10 +51,14 @@ export class SchedulesController {
   @Post('employee')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'BUSINESS_OWNER')
-  createEmployeeSchedule(@Body() dto: CreateEmployeeScheduleDto) {
-    return this.schedulesService.createEmployeeSchedule(dto);
+  createEmployeeSchedule(
+    @Body() dto: CreateEmployeeScheduleDto,
+    @GetUser() user: AuthUser,
+  ) {
+    return this.schedulesService.createEmployeeSchedule(dto, user);
   }
 
+  @Public()
   @Get('employee/:employeeId')
   getEmployeeSchedules(@Param('employeeId') employeeId: string) {
     return this.schedulesService.getEmployeeSchedules(employeeId);
@@ -57,8 +67,8 @@ export class SchedulesController {
   @Delete('employee/:id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'BUSINESS_OWNER')
-  removeEmployeeSchedule(@Param('id') id: string) {
-    return this.schedulesService.removeEmployeeSchedule(id);
+  removeEmployeeSchedule(@Param('id') id: string, @GetUser() user: AuthUser) {
+    return this.schedulesService.removeEmployeeSchedule(id, user);
   }
 
   // ─── Availability ─────────────────────────────────────────────────
@@ -68,7 +78,12 @@ export class SchedulesController {
   getAvailableSlots(
     @Param('businessId') businessId: string,
     @Query('date') date: string, // ?date=2025-03-15
+    @Query('employeeId') employeeId?: string,
   ) {
-    return this.schedulesService.getAvailableSlots(businessId, date);
+    return this.schedulesService.getAvailableSlots(
+      businessId,
+      date,
+      employeeId,
+    );
   }
 }

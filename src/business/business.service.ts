@@ -8,8 +8,11 @@ import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FindBusinessesQueryDto } from './dto/find-businesses-query.dto';
-import { Business, Prisma } from '@prisma/client';
+import { Business, BusinessImage, Prisma } from '@prisma/client';
 import { AuthUser } from 'src/auth/types/auth-user.type';
+import { SupabaseStorageService } from 'src/storage/supabase-storage.service';
+
+const IMAGES_ORDER = { images: { orderBy: { position: 'asc' as const } } };
 
 const NEARBY_LIMIT = 6;
 const TOP_RATED_LIMIT = 6;
@@ -17,7 +20,10 @@ const EARTH_RADIUS_KM = 6371;
 
 @Injectable()
 export class BusinessService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: SupabaseStorageService,
+  ) {}
 
   async create(createBusinessDto: CreateBusinessDto, user: AuthUser) {
     // Un BUSINESS_OWNER solo puede crear negocios para sí mismo; solo ADMIN
@@ -54,7 +60,10 @@ export class BusinessService {
   }
 
   async findOne(id: string) {
-    const business = await this.prisma.business.findUnique({ where: { id } });
+    const business = await this.prisma.business.findUnique({
+      where: { id },
+      include: IMAGES_ORDER,
+    });
     if (!business) {
       throw new NotFoundException('Negocio no encontrado');
     }
@@ -100,6 +109,7 @@ export class BusinessService {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: IMAGES_ORDER,
       }),
       this.prisma.business.count({ where }),
     ]);
@@ -118,7 +128,9 @@ export class BusinessService {
   // Sugerencias para el dashboard del cliente: negocios más cercanos (si se
   // da la ubicación) y negocios mejor puntuados (con al menos una reseña).
   async getRecommendations(lat?: number, lng?: number) {
-    const businesses = await this.prisma.business.findMany();
+    const businesses = await this.prisma.business.findMany({
+      include: IMAGES_ORDER,
+    });
     const withRatings = await this.attachRatings(businesses);
 
     const nearby =
@@ -147,6 +159,49 @@ export class BusinessService {
       .slice(0, TOP_RATED_LIMIT);
 
     return { nearby, topRated };
+  }
+
+  async addImages(
+    businessId: string,
+    files: Express.Multer.File[],
+    user: AuthUser,
+  ) {
+    await this.ensureOwnership(businessId, user);
+
+    const existingCount = await this.prisma.businessImage.count({
+      where: { businessId },
+    });
+
+    const images: BusinessImage[] = [];
+    for (const [index, file] of files.entries()) {
+      const { url, path } = await this.storage.uploadBusinessPhoto(
+        businessId,
+        file,
+      );
+      images.push(
+        await this.prisma.businessImage.create({
+          data: { businessId, url, path, position: existingCount + index },
+        }),
+      );
+    }
+
+    return images;
+  }
+
+  async removeImage(businessId: string, imageId: string, user: AuthUser) {
+    await this.ensureOwnership(businessId, user);
+
+    const image = await this.prisma.businessImage.findUnique({
+      where: { id: imageId },
+    });
+    if (!image || image.businessId !== businessId) {
+      throw new NotFoundException('Imagen no encontrada');
+    }
+
+    await this.prisma.businessImage.delete({ where: { id: imageId } });
+    await this.storage.deleteBusinessPhoto(image.path);
+
+    return { message: 'Imagen eliminada' };
   }
 
   // Verifica que el negocio exista y que el usuario sea su dueño (o ADMIN).

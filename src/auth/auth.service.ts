@@ -51,6 +51,8 @@ export class AuthService {
             name: dto.business.name,
             description: dto.business.description,
             category: dto.business.category,
+            latitude: dto.business.latitude,
+            longitude: dto.business.longitude,
             ownerId: newUser.id,
           },
         });

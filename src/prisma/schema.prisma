@@ -38,6 +38,19 @@ model Business {
   schedules    Schedule[]
   services     Service[]
   reviews      Review[]
+  images       BusinessImage[]
+}
+
+model BusinessImage {
+  id         String   @id @default(uuid())
+  businessId String
+  url        String
+  path       String
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
 }
 
 model Service {
