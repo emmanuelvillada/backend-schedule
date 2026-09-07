@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
@@ -12,9 +13,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { MailService } from 'src/mail/mail.service';
+import { GoogleProfile } from './google.strategy';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 @Injectable()
 export class AuthService {
@@ -61,6 +64,105 @@ export class AuthService {
       return newUser;
     });
 
+    // No verificar el correo no debe impedir que la cuenta quede creada; si
+    // el envío falla, el usuario puede reenviarlo después.
+    await this.sendVerificationEmail(user).catch((error: unknown) => {
+      this.logger.warn(
+        `No se pudo enviar el correo de verificación: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
+    return this.signToken(user.id, user.email, user.role);
+  }
+
+  private async sendVerificationEmail(user: { id: string; email: string }) {
+    const rawToken = randomBytes(32).toString('hex');
+    const hashedToken = this.hashToken(rawToken);
+
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token: hashedToken,
+        expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
+      },
+    });
+
+    await this.mailService.sendVerificationEmail(user.email, rawToken);
+  }
+
+  async verifyEmail(token: string) {
+    const hashedToken = this.hashToken(token);
+
+    const verificationToken =
+      await this.prisma.emailVerificationToken.findUnique({
+        where: { token: hashedToken },
+      });
+
+    if (
+      !verificationToken ||
+      verificationToken.usedAt ||
+      verificationToken.expiresAt < new Date()
+    ) {
+      throw new UnauthorizedException('Token inválido o expirado.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerified: true },
+      }),
+      this.prisma.emailVerificationToken.update({
+        where: { id: verificationToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Correo verificado correctamente.' };
+  }
+
+  async resendVerificationEmail(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    if (user.emailVerified) {
+      return { message: 'Tu correo ya está verificado.' };
+    }
+
+    await this.sendVerificationEmail(user);
+    return { message: 'Correo de verificación reenviado.' };
+  }
+
+  // Si ya existe una cuenta con ese correo (creada con contraseña o con
+  // Google antes), inicia sesión ahí. Si no, crea una cuenta CLIENT nueva
+  // — "Continuar con Google" siempre es para clientes; un dueño de negocio
+  // sigue necesitando el registro completo (para cargar los datos del negocio).
+  async loginWithGoogle(profile: GoogleProfile) {
+    let user = await this.prisma.user.findUnique({
+      where: { email: profile.email },
+    });
+
+    if (!user) {
+      // Contraseña aleatoria e inutilizable: esta cuenta solo se accede vía
+      // Google, salvo que después pase por "olvidé mi contraseña".
+      const randomPassword = randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
+
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email,
+          name: profile.name,
+          password: hashedPassword,
+          role: 'CLIENT',
+          emailVerified: true, // Google ya verificó este correo
+        },
+      });
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tu cuenta ha sido suspendida');
+    }
+
     return this.signToken(user.id, user.email, user.role);
   }
 
@@ -76,6 +178,10 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) {
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tu cuenta ha sido suspendida');
     }
 
     return this.signToken(user.id, user.email, user.role);

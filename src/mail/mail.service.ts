@@ -169,6 +169,86 @@ export class MailService {
     });
   }
 
+  async sendAppointmentConfirmationEmail(
+    email: string,
+    clientName: string,
+    businessName: string,
+    startTime: Date,
+  ) {
+    const safeName = escapeHtml(clientName);
+    const safeBusiness = escapeHtml(businessName);
+    const dateLabel = this.formatDateEs(startTime);
+
+    return this.sendEmail({
+      to: email,
+      subject: `Cita confirmada en ${businessName}`,
+      html: this.buildLayout(`
+        <h2>Hola ${safeName}</h2>
+        <p>Tu cita en <strong>${safeBusiness}</strong> quedó agendada para el ${dateLabel}.</p>
+        <p>Te avisaremos por acá si algo cambia.</p>
+      `),
+      text: `Hola ${clientName}. Tu cita en ${businessName} quedó agendada para el ${dateLabel}.`,
+    });
+  }
+
+  async sendNewBookingOwnerEmail(
+    email: string,
+    ownerName: string,
+    businessName: string,
+    clientName: string,
+    startTime: Date,
+  ) {
+    const safeOwner = escapeHtml(ownerName);
+    const safeClient = escapeHtml(clientName);
+    const dateLabel = this.formatDateEs(startTime);
+
+    return this.sendEmail({
+      to: email,
+      subject: `Nueva cita en ${businessName}`,
+      html: this.buildLayout(`
+        <h2>Hola ${safeOwner}</h2>
+        <p><strong>${safeClient}</strong> reservó una cita en ${businessName} para el ${dateLabel}.</p>
+      `),
+      text: `Hola ${ownerName}. ${clientName} reservó una cita en ${businessName} para el ${dateLabel}.`,
+    });
+  }
+
+  async sendAppointmentStatusEmail(
+    email: string,
+    clientName: string,
+    businessName: string,
+    status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED',
+    startTime: Date,
+  ) {
+    const safeName = escapeHtml(clientName);
+    const safeBusiness = escapeHtml(businessName);
+    const dateLabel = this.formatDateEs(startTime);
+    const statusLabels: Record<typeof status, string> = {
+      CONFIRMED: 'confirmada',
+      CANCELLED: 'cancelada',
+      COMPLETED: 'completada',
+    };
+    const statusLabel = statusLabels[status];
+
+    return this.sendEmail({
+      to: email,
+      subject: `Tu cita en ${businessName} fue ${statusLabel}`,
+      html: this.buildLayout(`
+        <h2>Hola ${safeName}</h2>
+        <p>Tu cita en <strong>${safeBusiness}</strong> del ${dateLabel} fue <strong>${statusLabel}</strong>.</p>
+      `),
+      text: `Hola ${clientName}. Tu cita en ${businessName} del ${dateLabel} fue ${statusLabel}.`,
+    });
+  }
+
+  private formatDateEs(date: Date): string {
+    return new Intl.DateTimeFormat('es-CO', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: 'America/Bogota',
+    }).format(date);
+  }
+
   // Punto único para envolver el contenido de cada correo.
   // Si luego quieres agregar header/footer/estilos comunes, solo tocas aquí.
   private buildLayout(content: string): string {

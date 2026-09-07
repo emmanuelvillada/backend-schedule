@@ -37,7 +37,9 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.6.1",
     "joi": "^18.2.3",
+    "mercadopago": "^3.6.0",
     "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
     "prisma": "^6.19.1",
@@ -55,6 +57,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.10.7",
+    "@types/passport-google-oauth20": "^2.0.17",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.1.8",
@@ -81,6 +84,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

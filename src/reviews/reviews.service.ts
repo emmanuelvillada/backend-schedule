@@ -59,4 +59,25 @@ export class ReviewsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async reply(id: string, replyText: string, user: AuthUser) {
+    const review = await this.prisma.review.findUnique({ where: { id } });
+    if (!review) {
+      throw new NotFoundException('Reseña no encontrada');
+    }
+
+    if (user.role !== 'ADMIN') {
+      const business = await this.prisma.business.findUnique({
+        where: { id: review.businessId },
+      });
+      if (!business || business.ownerId !== user.id) {
+        throw new ForbiddenException('No tienes permiso sobre este negocio');
+      }
+    }
+
+    return this.prisma.review.update({
+      where: { id },
+      data: { ownerReply: replyText, ownerRepliedAt: new Date() },
+    });
+  }
 }

@@ -9,18 +9,33 @@ datasource db {
 }
 
 model User {
-  id                  String                @id @default(uuid())
-  email               String                @unique
-  password            String
-  name                String
-  phone               String?
-  role                Role                  @default(CLIENT)
-  createdAt           DateTime              @default(now())
-  clientAppointments  Appointment[]         @relation("ClientAppointments")
-  ownedBusiness       Business?             @relation("OwnerBusinesses")
-  employeeProfile     Employee?
-  passwordResetTokens PasswordResetToken[]
-  reviews             Review[]              @relation("ClientReviews")
+  id                      String                    @id @default(uuid())
+  email                   String                    @unique
+  password                String
+  name                    String
+  phone                   String?
+  role                    Role                      @default(CLIENT)
+  emailVerified           Boolean                   @default(false)
+  isActive                Boolean                   @default(true)
+  createdAt               DateTime                  @default(now())
+  clientAppointments      Appointment[]             @relation("ClientAppointments")
+  ownedBusiness           Business?                 @relation("OwnerBusinesses")
+  employeeProfile         Employee?
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  reviews                 Review[]                  @relation("ClientReviews")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Business {
@@ -29,8 +44,11 @@ model Business {
   description  String?
   category     BusinessCategory
   ownerId      String           @unique
+  address      String?
+  phone        String?
   latitude     Float?
   longitude    Float?
+  isActive     Boolean          @default(true)
   createdAt    DateTime         @default(now())
   appointments Appointment[]
   owner        User             @relation("OwnerBusinesses", fields: [ownerId], references: [id])
@@ -39,6 +57,21 @@ model Business {
   services     Service[]
   reviews      Review[]
   images       BusinessImage[]
+  closures     BusinessClosure[]
+}
+
+// Días puntuales (no recurrentes) donde el negocio no atiende: festivos,
+// vacaciones, etc. Distinto de `Schedule`, que es el horario semanal fijo.
+model BusinessClosure {
+  id         String   @id @default(uuid())
+  businessId String
+  date       String // "YYYY-MM-DD"
+  reason     String?
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, date])
+  @@index([businessId])
 }
 
 model BusinessImage {
@@ -110,19 +143,37 @@ model Appointment {
   employee   Employee?            @relation(fields: [employeeId], references: [id])
   services   AppointmentService[]
   review     Review?
+  payment    Payment?
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  appointmentId  String        @unique
+  appointment    Appointment   @relation(fields: [appointmentId], references: [id])
+  status         PaymentStatus @default(PENDING)
+  amount         Float
+  currency       String        @default("COP")
+  preferenceId   String? // id de la preferencia de MercadoPago (Checkout Pro)
+  mpPaymentId    String? // id del pago en MercadoPago, se conoce tras el webhook
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([mpPaymentId])
 }
 
 model Review {
-  id            String      @id @default(uuid())
-  rating        Int
-  comment       String?
-  createdAt     DateTime    @default(now())
-  businessId    String
-  business      Business    @relation(fields: [businessId], references: [id])
-  clientId      String
-  client        User        @relation("ClientReviews", fields: [clientId], references: [id])
-  appointmentId String      @unique
-  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  id             String      @id @default(uuid())
+  rating         Int
+  comment        String?
+  createdAt      DateTime    @default(now())
+  businessId     String
+  business       Business    @relation(fields: [businessId], references: [id])
+  clientId       String
+  client         User        @relation("ClientReviews", fields: [clientId], references: [id])
+  appointmentId  String      @unique
+  appointment    Appointment @relation(fields: [appointmentId], references: [id])
+  ownerReply     String?
+  ownerRepliedAt DateTime?
 
   @@index([businessId])
 }
@@ -169,4 +220,12 @@ enum AppointmentStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
 }

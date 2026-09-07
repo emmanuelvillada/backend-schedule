@@ -24,6 +24,14 @@ export class CreateBusinessDto {
   ownerId?: string;
 
   @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(-90)
   @Max(90)

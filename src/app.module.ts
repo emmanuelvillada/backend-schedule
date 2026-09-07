@@ -11,6 +11,8 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { EmployeesModule } from './employees/employees.module';
+import { PaymentsModule } from './payments/payments.module';
+import { AdminModule } from './admin/admin.module';
 import { MailService } from './mail/mail.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailModule } from './mail/mail.module';
@@ -29,6 +31,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AppointmentsModule,
     ReviewsModule,
     EmployeesModule,
+    PaymentsModule,
+    AdminModule,
     MailModule,
     ConfigModule.forRoot({
       isGlobal: true,

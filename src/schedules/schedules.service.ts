@@ -1,11 +1,14 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
+import { CreateBusinessClosureDto } from './dto/create-business-closure.dto';
 import { AuthUser } from 'src/auth/types/auth-user.type';
 
 @Injectable()
@@ -31,6 +34,54 @@ export class SchedulesService {
     if (!schedule) throw new NotFoundException(`Schedule ${id} not found`);
     await this.ensureBusinessOwnership(schedule.businessId, user);
     return this.prisma.schedule.delete({ where: { id } });
+  }
+
+  // ─── Closures (días puntuales sin servicio: festivos, vacaciones) ──
+
+  async createClosure(
+    businessId: string,
+    dto: CreateBusinessClosureDto,
+    user: AuthUser,
+  ) {
+    await this.ensureBusinessOwnership(businessId, user);
+    try {
+      return await this.prisma.businessClosure.create({
+        data: { businessId, date: dto.date, reason: dto.reason },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Ese día ya está bloqueado');
+      }
+      throw error;
+    }
+  }
+
+  getClosures(businessId: string) {
+    return this.prisma.businessClosure.findMany({
+      where: { businessId },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  async removeClosure(id: string, user: AuthUser) {
+    const closure = await this.prisma.businessClosure.findUnique({
+      where: { id },
+    });
+    if (!closure) throw new NotFoundException('Día bloqueado no encontrado');
+    await this.ensureBusinessOwnership(closure.businessId, user);
+    return this.prisma.businessClosure.delete({ where: { id } });
+  }
+
+  // Usado tanto por getAvailableSlots como por AppointmentsService (para
+  // que un cliente no pueda reservar mandando la fecha directo a la API).
+  async isClosed(businessId: string, date: string): Promise<boolean> {
+    const closure = await this.prisma.businessClosure.findUnique({
+      where: { businessId_date: { businessId, date } },
+    });
+    return !!closure;
   }
 
   // ─── Employee Schedules ───────────────────────────────────────────
@@ -84,6 +135,8 @@ export class SchedulesService {
     date: string,
     employeeId?: string,
   ): Promise<string[]> {
+    if (await this.isClosed(businessId, date)) return [];
+
     const dayOfWeek = new Date(date).getUTCDay();
     const startOfDay = new Date(`${date}T00:00:00.000Z`);
     const endOfDay = new Date(`${date}T23:59:59.999Z`);

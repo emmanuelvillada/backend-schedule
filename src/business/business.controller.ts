@@ -43,8 +43,8 @@ export class BusinessController {
 
   @Public()
   @Get()
-  findAll(@Query() query: FindBusinessesQueryDto) {
-    return this.businessService.findAll(query);
+  findAll(@Query() query: FindBusinessesQueryDto, @GetUser() user?: AuthUser) {
+    return this.businessService.findAll(query, user);
   }
 
   @Public()
@@ -55,8 +55,8 @@ export class BusinessController {
 
   @Public()
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.businessService.findOne(id);
+  findOne(@Param('id') id: string, @GetUser() user?: AuthUser) {
+    return this.businessService.findOne(id, user);
   }
 
   @Patch(':id')

@@ -59,12 +59,18 @@ export class BusinessService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: AuthUser) {
     const business = await this.prisma.business.findUnique({
       where: { id },
       include: IMAGES_ORDER,
     });
-    if (!business) {
+    // Un negocio suspendido solo lo puede ver su dueño o un admin, no el público.
+    if (
+      !business ||
+      (!business.isActive &&
+        user?.role !== 'ADMIN' &&
+        business.ownerId !== user?.id)
+    ) {
       throw new NotFoundException('Negocio no encontrado');
     }
     const [withRating] = await this.attachRatings([business]);
@@ -89,10 +95,19 @@ export class BusinessService {
   }
 
   //encontrar todos los negocios por cualqier filtro aplicable
-  async findAll(query: FindBusinessesQueryDto) {
+  async findAll(query: FindBusinessesQueryDto, user?: AuthUser) {
     const { search, category, ownerId, page = 1, limit = 10 } = query;
 
+    // El listado público no debe mostrar negocios suspendidos. Excepciones:
+    // un admin (para poder reactivarlos) y un dueño consultando su propio
+    // negocio (para que sepa que está suspendido, en vez de ver "no existe").
+    const isOwnerLookingAtSelf =
+      user?.role === 'BUSINESS_OWNER' && ownerId === user.id;
+    const isActive =
+      user?.role === 'ADMIN' || isOwnerLookingAtSelf ? undefined : true;
+
     const where: Prisma.BusinessWhereInput = {
+      ...(isActive !== undefined && { isActive }),
       ...(category && { category }),
       ...(ownerId && { ownerId }),
       ...(search && {

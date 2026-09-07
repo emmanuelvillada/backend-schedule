@@ -11,6 +11,7 @@ import {
 import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
+import { CreateBusinessClosureDto } from './dto/create-business-closure.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -44,6 +45,32 @@ export class SchedulesController {
   @Roles('ADMIN', 'BUSINESS_OWNER')
   removeBusinessSchedule(@Param('id') id: string, @GetUser() user: AuthUser) {
     return this.schedulesService.removeBusinessSchedule(id, user);
+  }
+
+  // ─── Closures (vacaciones, festivos) ───────────────────────────────
+
+  @Post('business/:businessId/closures')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'BUSINESS_OWNER')
+  createClosure(
+    @Param('businessId') businessId: string,
+    @Body() dto: CreateBusinessClosureDto,
+    @GetUser() user: AuthUser,
+  ) {
+    return this.schedulesService.createClosure(businessId, dto, user);
+  }
+
+  @Public()
+  @Get('business/:businessId/closures')
+  getClosures(@Param('businessId') businessId: string) {
+    return this.schedulesService.getClosures(businessId);
+  }
+
+  @Delete('closures/:id')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'BUSINESS_OWNER')
+  removeClosure(@Param('id') id: string, @GetUser() user: AuthUser) {
+    return this.schedulesService.removeClosure(id, user);
   }
 
   // ─── Employee ─────────────────────────────────────────────────────
