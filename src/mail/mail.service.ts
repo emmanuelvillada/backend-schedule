@@ -12,6 +12,11 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
 }
+export interface ReminderEmailData {
+  to: string;
+  name: string;
+  startTime: Date;
+}
 
 // Escapa caracteres especiales de HTML para evitar HTML/Script injection
 // cuando interpolamos datos del usuario dentro de las plantillas.
@@ -240,6 +245,22 @@ export class MailService {
       text: `Hola ${clientName}. Tu cita en ${businessName} del ${dateLabel} fue ${statusLabel}.`,
     });
   }
+
+  async sendReminder({ to, name, startTime }: ReminderEmailData) {
+    const dateLabel = this.formatDateEs(startTime);
+
+    return this.sendEmail({
+      to,
+      subject: 'Recordatorio de cita',
+      html: this.buildLayout(`
+      <h2>Hola ${escapeHtml(name)}</h2>
+      <p>Te recordamos que tienes una cita el ${dateLabel}.</p>
+    `),
+      text: `Hola ${name}. Te recordamos que tienes una cita el ${dateLabel}.`,
+    });
+  }
+
+  //utils
 
   private formatDateEs(date: Date): string {
     return new Intl.DateTimeFormat('es-CO', {

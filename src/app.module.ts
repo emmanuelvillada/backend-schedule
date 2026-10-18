@@ -20,6 +20,9 @@ import Joi from 'joi';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RemembersModule } from './remembers/remembers.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { NotificationsResolver } from './notifications/notifications.resolver';
 import { RemembersModule } from './remembers/remembers.module';
 
 @Module({
@@ -46,6 +49,8 @@ import { RemembersModule } from './remembers/remembers.module';
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     RemembersModule,
+    NotificationsModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [
@@ -58,6 +63,7 @@ import { RemembersModule } from './remembers/remembers.module';
       useClass: AllExceptionsFilter, // Filtro global de excepciones
     },
     MailService,
+    NotificationsResolver,
   ],
 })
 export class AppModule {}
