@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { WhatsappService } from 'src/whatsapp/whatsapp.service';
 import { MailService } from 'src/mail/mail.service';
 import { Logger } from '@nestjs/common';

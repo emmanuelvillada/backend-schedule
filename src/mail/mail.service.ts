@@ -16,6 +16,8 @@ export interface ReminderEmailData {
   to: string;
   name: string;
   startTime: Date;
+  employeeName?: string;
+  businessName?: string;
 }
 
 // Escapa caracteres especiales de HTML para evitar HTML/Script injection
@@ -246,8 +248,16 @@ export class MailService {
     });
   }
 
-  async sendReminder({ to, name, startTime }: ReminderEmailData) {
+  async sendReminder({
+    to,
+    name,
+    startTime,
+    employeeName,
+    businessName,
+  }: ReminderEmailData) {
     const dateLabel = this.formatDateEs(startTime);
+    const conQuien = employeeName ? ` con ${escapeHtml(employeeName)}` : '';
+    const enDonde = businessName ? ` en ${escapeHtml(businessName)}` : '';
 
     return this.sendEmail({
       to,
@@ -256,7 +266,8 @@ export class MailService {
       <h2>Hola ${escapeHtml(name)}</h2>
       <p>Te recordamos que tienes una cita el ${dateLabel}.</p>
     `),
-      text: `Hola ${name}. Te recordamos que tienes una cita el ${dateLabel}.`,
+      text: `Te recordamos que tienes una cita${conQuien}${enDonde} el ${dateLabel}.
+      a las ${startTime.getHours()}:${startTime.getMinutes()} hrs.`,
     });
   }
 

@@ -148,6 +148,7 @@ model Appointment {
   services   AppointmentService[]
   review     Review?
   payment    Payment?
+   @@index([notificationSent, startTime])
 }
 
 model Payment {

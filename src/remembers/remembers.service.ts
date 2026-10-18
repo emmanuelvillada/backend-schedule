@@ -47,6 +47,8 @@ export class RemembersService {
           to: cita.client.email,
           name: cita.client.name ?? 'cliente',
           startTime: cita.startTime,
+          employeeName: cita.employee?.user.name,
+          businessName: cita.business.name,
         });
       } catch (err) {
         // Si falla el envío, liberamos la cita para reintentar en el próximo ciclo
