@@ -73,6 +73,50 @@ export class SupabaseStorageService {
     }
   }
 
+  // Reutiliza el mismo bucket que las fotos de negocio, bajo su propio
+  // prefijo, para no requerir que se cree y configure un bucket adicional.
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<{ url: string; path: string }> {
+    const client = this.ensureClient();
+    const extension = file.originalname.split('.').pop() ?? 'jpg';
+    const path = `avatars/${userId}/${randomUUID()}.${extension}`;
+
+    const { error } = await client.storage
+      .from(BUSINESS_PHOTOS_BUCKET)
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      this.logger.error(
+        `Error subiendo foto de perfil a Supabase Storage: ${error.message}`,
+      );
+      throw new InternalServerErrorException('No se pudo subir la foto');
+    }
+
+    const { data } = client.storage
+      .from(BUSINESS_PHOTOS_BUCKET)
+      .getPublicUrl(path);
+
+    return { url: data.publicUrl, path };
+  }
+
+  async deleteAvatar(path: string): Promise<void> {
+    const client = this.ensureClient();
+    const { error } = await client.storage
+      .from(BUSINESS_PHOTOS_BUCKET)
+      .remove([path]);
+
+    if (error) {
+      this.logger.error(
+        `Error borrando foto de perfil de Supabase Storage: ${error.message}`,
+      );
+    }
+  }
+
   private ensureClient(): SupabaseClient {
     if (!this.client) {
       throw new InternalServerErrorException(

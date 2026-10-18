@@ -11,6 +11,12 @@ import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
 import { CreateBusinessClosureDto } from './dto/create-business-closure.dto';
 import { AuthUser } from 'src/auth/types/auth-user.type';
 
+// Los slots candidatos siguen alineados a una grilla de 30 min (mejor UX
+// que ofrecer horas sueltas); lo que cambia es que ahora se exige que la
+// duración completa del servicio quepa libre a partir de ahí.
+const SLOT_STEP_MIN = 30;
+const DEFAULT_SLOT_DURATION_MIN = 30;
+
 @Injectable()
 export class SchedulesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -134,6 +140,7 @@ export class SchedulesService {
     businessId: string,
     date: string,
     employeeId?: string,
+    durationMin: number = DEFAULT_SLOT_DURATION_MIN,
   ): Promise<string[]> {
     if (await this.isClosed(businessId, date)) return [];
 
@@ -149,6 +156,7 @@ export class SchedulesService {
         date,
         startOfDay,
         endOfDay,
+        durationMin,
       );
     }
 
@@ -163,6 +171,7 @@ export class SchedulesService {
         date,
         startOfDay,
         endOfDay,
+        durationMin,
       );
     }
 
@@ -175,11 +184,45 @@ export class SchedulesService {
           date,
           startOfDay,
           endOfDay,
+          durationMin,
         ),
       ),
     );
 
     return Array.from(new Set(perEmployee.flat())).sort();
+  }
+
+  // Único lugar donde se resuelve qué horario aplica un día dado: el propio
+  // del trabajador si tiene uno configurado, si no el general del negocio.
+  // Lo usa tanto la disponibilidad (abajo) como AppointmentsService, para
+  // rechazar en el servidor una cita que se saldría del horario de atención
+  // aunque el cliente la mande directo a la API sin pasar por estos slots.
+  async getOpenHours(
+    businessId: string,
+    employeeId: string | null,
+    dayOfWeek: number,
+  ): Promise<{ openTime: string; closeTime: string } | null> {
+    if (employeeId) {
+      const employeeSchedule = await this.prisma.employeeSchedule.findFirst({
+        where: { employeeId, dayOfWeek },
+      });
+      if (employeeSchedule) {
+        return {
+          openTime: employeeSchedule.startTime,
+          closeTime: employeeSchedule.endTime,
+        };
+      }
+    }
+
+    const businessSchedule = await this.prisma.schedule.findFirst({
+      where: { businessId, dayOfWeek },
+    });
+    return businessSchedule
+      ? {
+          openTime: businessSchedule.openTime,
+          closeTime: businessSchedule.closeTime,
+        }
+      : null;
   }
 
   /**
@@ -216,27 +259,16 @@ export class SchedulesService {
     date: string,
     startOfDay: Date,
     endOfDay: Date,
+    durationMin: number,
   ): Promise<string[]> {
-    const employeeSchedule = await this.prisma.employeeSchedule.findFirst({
-      where: { employeeId, dayOfWeek },
-    });
+    const hours = await this.getOpenHours(businessId, employeeId, dayOfWeek);
+    if (!hours) return []; // Ni el trabajador ni el negocio abren ese día
 
-    let openTime: string;
-    let closeTime: string;
-
-    if (employeeSchedule) {
-      openTime = employeeSchedule.startTime;
-      closeTime = employeeSchedule.endTime;
-    } else {
-      const businessSchedule = await this.prisma.schedule.findFirst({
-        where: { businessId, dayOfWeek },
-      });
-      if (!businessSchedule) return []; // Ni el trabajador ni el negocio abren ese día
-      openTime = businessSchedule.openTime;
-      closeTime = businessSchedule.closeTime;
-    }
-
-    const slots = this.generateSlots(openTime, closeTime, 30);
+    const slots = this.generateSlots(
+      hours.openTime,
+      hours.closeTime,
+      SLOT_STEP_MIN,
+    );
 
     const appointments = await this.prisma.appointment.findMany({
       where: {
@@ -247,7 +279,13 @@ export class SchedulesService {
       select: { startTime: true, endTime: true },
     });
 
-    return this.filterAvailable(slots, date, appointments);
+    return this.filterAvailable(
+      slots,
+      date,
+      hours.closeTime,
+      durationMin,
+      appointments,
+    );
   }
 
   private async getBusinessLevelSlots(
@@ -256,13 +294,16 @@ export class SchedulesService {
     date: string,
     startOfDay: Date,
     endOfDay: Date,
+    durationMin: number,
   ): Promise<string[]> {
-    const schedule = await this.prisma.schedule.findFirst({
-      where: { businessId, dayOfWeek },
-    });
-    if (!schedule) return [];
+    const hours = await this.getOpenHours(businessId, null, dayOfWeek);
+    if (!hours) return [];
 
-    const slots = this.generateSlots(schedule.openTime, schedule.closeTime, 30);
+    const slots = this.generateSlots(
+      hours.openTime,
+      hours.closeTime,
+      SLOT_STEP_MIN,
+    );
 
     const appointments = await this.prisma.appointment.findMany({
       where: {
@@ -273,18 +314,39 @@ export class SchedulesService {
       select: { startTime: true, endTime: true },
     });
 
-    return this.filterAvailable(slots, date, appointments);
+    return this.filterAvailable(
+      slots,
+      date,
+      hours.closeTime,
+      durationMin,
+      appointments,
+    );
   }
 
+  // Un slot solo cuenta como disponible si TODO el rango que ocuparía el
+  // servicio (no solo su instante de inicio) está libre de otras citas y
+  // cabe antes del cierre — no solo si el propio inicio cae fuera de un
+  // rango ocupado, que es lo que hacía antes y podía ofrecer horas que en
+  // realidad se solapaban con la cita siguiente o se pasaban del cierre.
   private filterAvailable(
     slots: string[],
     date: string,
+    closeTime: string,
+    durationMin: number,
     appointments: { startTime: Date; endTime: Date }[],
   ): string[] {
+    const [closeH, closeM] = closeTime.split(':').map(Number);
+    const closesAt = new Date(`${date}T00:00:00.000Z`);
+    closesAt.setUTCHours(closeH, closeM, 0, 0);
+
     return slots.filter((slot) => {
       const slotStart = new Date(`${date}T${slot}:00.000Z`);
+      const slotEnd = new Date(slotStart.getTime() + durationMin * 60000);
+
+      if (slotEnd > closesAt) return false;
+
       return !appointments.some(
-        (apt) => slotStart >= apt.startTime && slotStart < apt.endTime,
+        (apt) => slotStart < apt.endTime && slotEnd > apt.startTime,
       );
     });
   }

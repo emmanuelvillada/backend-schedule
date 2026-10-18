@@ -14,6 +14,8 @@ model User {
   password                String
   name                    String
   phone                   String?
+  avatarUrl               String?
+  avatarPath              String?
   role                    Role                      @default(CLIENT)
   emailVerified           Boolean                   @default(false)
   isActive                Boolean                   @default(true)
@@ -89,6 +91,7 @@ model BusinessImage {
 model Service {
   id           String               @id @default(uuid())
   name         String
+  description  String?
   durationMin  Int
   price        Float
   isActive     Boolean              @default(true)
@@ -138,6 +141,7 @@ model Appointment {
   employeeId String?
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
+  notificationSent Boolean  @default(false)
   business   Business             @relation(fields: [businessId], references: [id])
   client     User                 @relation("ClientAppointments", fields: [clientId], references: [id])
   employee   Employee?            @relation(fields: [employeeId], references: [id])

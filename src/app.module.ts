@@ -19,6 +19,8 @@ import { MailModule } from './mail/mail.module';
 import Joi from 'joi';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { RemembersModule } from './remembers/remembers.module';
+import { RemembersModule } from './remembers/remembers.module';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+    RemembersModule,
   ],
   controllers: [AppController],
   providers: [

@@ -3,23 +3,36 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes, createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MailService } from 'src/mail/mail.service';
+import { SupabaseStorageService } from 'src/storage/supabase-storage.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { AuthUser } from 'src/auth/types/auth-user.type';
 
 const SALT_ROUNDS = 10;
 const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 
+const EMPLOYEE_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  avatarUrl: true,
+};
+
 @Injectable()
 export class EmployeesService {
+  private readonly logger = new Logger(EmployeesService.name);
+
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    private storage: SupabaseStorageService,
   ) {}
 
   async create(dto: CreateEmployeeDto, user: AuthUser) {
@@ -58,9 +71,7 @@ export class EmployeesService {
       return tx.employee.create({
         data: { userId: newUser.id, businessId: business.id },
         include: {
-          user: {
-            select: { id: true, name: true, email: true, phone: true },
-          },
+          user: { select: EMPLOYEE_USER_SELECT },
         },
       });
     });
@@ -75,12 +86,21 @@ export class EmployeesService {
       },
     });
 
-    await this.mailService.sendEmployeeInviteEmail(
-      employee.user.email,
-      employee.user.name,
-      business.name,
-      rawToken,
-    );
+    // El trabajador y su token de invitación ya quedaron guardados; que el
+    // correo falle (ej. proveedor en modo sandbox) no debe tumbar la
+    // creación ni ocultar al dueño que el trabajador sí se creó.
+    try {
+      await this.mailService.sendEmployeeInviteEmail(
+        employee.user.email,
+        employee.user.name,
+        business.name,
+        rawToken,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo enviar la invitación al trabajador: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     return employee;
   }
@@ -90,25 +110,85 @@ export class EmployeesService {
     return this.prisma.employee.findMany({
       where: { businessId },
       include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
+        user: { select: EMPLOYEE_USER_SELECT },
       },
     });
   }
 
   // Lista pública mínima, usada por el cliente para elegir con quién
-  // reservar (sin exponer email/teléfono).
+  // reservar (sin exponer email/teléfono). La foto sí se expone: es
+  // justamente lo que le facilita al cliente identificar a cada trabajador.
   findPublicByBusiness(businessId: string) {
     return this.prisma.employee.findMany({
       where: { businessId },
       select: {
         id: true,
-        user: { select: { name: true } },
+        user: { select: { name: true, avatarUrl: true } },
       },
     });
   }
 
+  async setAvatar(id: string, file: Express.Multer.File, user: AuthUser) {
+    const employee = await this.findEmployeeWithAccess(id, user);
+
+    if (employee.user.avatarPath) {
+      await this.storage.deleteAvatar(employee.user.avatarPath);
+    }
+
+    const { url, path } = await this.storage.uploadAvatar(
+      employee.userId,
+      file,
+    );
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: employee.userId },
+      data: { avatarUrl: url, avatarPath: path },
+      select: EMPLOYEE_USER_SELECT,
+    });
+
+    return { ...employee, user: updatedUser };
+  }
+
+  async removeAvatar(id: string, user: AuthUser) {
+    const employee = await this.findEmployeeWithAccess(id, user);
+
+    if (employee.user.avatarPath) {
+      await this.storage.deleteAvatar(employee.user.avatarPath);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: employee.userId },
+      data: { avatarUrl: null, avatarPath: null },
+      select: EMPLOYEE_USER_SELECT,
+    });
+
+    return { ...employee, user: updatedUser };
+  }
+
+  // Dueño/admin del negocio, o el propio trabajador gestionando su foto.
+  private async findEmployeeWithAccess(id: string, user: AuthUser) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: {
+        user: { select: { ...EMPLOYEE_USER_SELECT, avatarPath: true } },
+      },
+    });
+    if (!employee) {
+      throw new NotFoundException('Trabajador no encontrado');
+    }
+
+    if (employee.userId !== user.id) {
+      await this.ensureOwnership(employee.businessId, user);
+    }
+
+    return employee;
+  }
+
   async remove(id: string, user: AuthUser) {
-    const employee = await this.prisma.employee.findUnique({ where: { id } });
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { user: { select: { avatarPath: true } } },
+    });
     if (!employee) {
       throw new NotFoundException('Trabajador no encontrado');
     }
@@ -119,6 +199,10 @@ export class EmployeesService {
       this.prisma.employee.delete({ where: { id } }),
       this.prisma.user.delete({ where: { id: employee.userId } }),
     ]);
+
+    if (employee.user.avatarPath) {
+      await this.storage.deleteAvatar(employee.user.avatarPath);
+    }
 
     return { message: 'Trabajador eliminado' };
   }

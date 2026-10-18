@@ -12,6 +12,7 @@ import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { CreateEmployeeScheduleDto } from './dto/create-employee-schedule.dto';
 import { CreateBusinessClosureDto } from './dto/create-business-closure.dto';
+import { GetAvailabilityQueryDto } from './dto/get-availability-query.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -104,13 +105,13 @@ export class SchedulesController {
   @Get('availability/:businessId')
   getAvailableSlots(
     @Param('businessId') businessId: string,
-    @Query('date') date: string, // ?date=2025-03-15
-    @Query('employeeId') employeeId?: string,
+    @Query() query: GetAvailabilityQueryDto,
   ) {
     return this.schedulesService.getAvailableSlots(
       businessId,
-      date,
-      employeeId,
+      query.date,
+      query.employeeId,
+      query.durationMin,
     );
   }
 }

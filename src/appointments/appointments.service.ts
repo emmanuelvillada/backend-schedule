@@ -98,6 +98,21 @@ export class AppointmentsService {
     // negocio no tiene trabajadores) validando disponibilidad real.
     const employeeId = await this.resolveEmployee(dto, startTime, endTime);
 
+    // 3.5. Rechazar si la cita completa (con la duración real de los
+    // servicios elegidos) no cabe dentro del horario de atención — no solo
+    // confiar en que el listado de horarios disponibles ya la haya filtrado,
+    // un cliente podría mandar cualquier hora directo a la API.
+    const hours = await this.schedulesService.getOpenHours(
+      dto.businessId,
+      employeeId,
+      startTime.getUTCDay(),
+    );
+    if (!hours || !this.isWithinHours(startTime, endTime, hours)) {
+      throw new BadRequestException(
+        'El horario seleccionado está fuera del horario de atención',
+      );
+    }
+
     // 4. Crear appointment con sus servicios
     const appointment = await this.prisma.appointment.create({
       data: {
@@ -185,6 +200,22 @@ export class AppointmentsService {
       throw new BadRequestException('The selected time slot is not available');
     }
     return availableEmployeeId;
+  }
+
+  private isWithinHours(
+    startTime: Date,
+    endTime: Date,
+    hours: { openTime: string; closeTime: string },
+  ): boolean {
+    const [openH, openM] = hours.openTime.split(':').map(Number);
+    const [closeH, closeM] = hours.closeTime.split(':').map(Number);
+
+    const opensAt = new Date(startTime);
+    opensAt.setUTCHours(openH, openM, 0, 0);
+    const closesAt = new Date(startTime);
+    closesAt.setUTCHours(closeH, closeM, 0, 0);
+
+    return startTime >= opensAt && endTime <= closesAt;
   }
 
   async findAllByBusiness(businessId: string, user: AuthUser) {
