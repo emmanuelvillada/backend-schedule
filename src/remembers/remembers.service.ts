@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-
+import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class RemembersService {
   private readonly logger = new Logger(RemembersService.name);
@@ -10,6 +10,7 @@ export class RemembersService {
   constructor(
     private prisma: PrismaService,
     private email: MailService,
+    private notifications: NotificationsService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -24,7 +25,9 @@ export class RemembersService {
         startTime: { gt: ahora, lte: enUnaHora },
       },
       include: {
-        client: { select: { name: true, email: true } },
+        client: {
+          select: { name: true, email: true, phone: true, whatsappOptIn: true },
+        },
         employee: { select: { user: { select: { name: true } } } },
         business: { select: { name: true } },
       },
@@ -43,12 +46,14 @@ export class RemembersService {
       if (count === 0) continue;
 
       try {
-        await this.email.sendReminder({
-          to: cita.client.email,
+        await this.notifications.sendAppointmentReminder({
           name: cita.client.name ?? 'cliente',
-          startTime: cita.startTime,
-          employeeName: cita.employee?.user.name,
+          email: cita.client.email,
+          phone: cita.client.phone,
+          whatsappOptIn: cita.client.whatsappOptIn,
           businessName: cita.business.name,
+          employeeName: cita.employee?.user.name,
+          startTime: cita.startTime,
         });
       } catch (err) {
         // Si falla el envío, liberamos la cita para reintentar en el próximo ciclo

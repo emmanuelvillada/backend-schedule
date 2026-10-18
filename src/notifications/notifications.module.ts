@@ -1,8 +1,8 @@
+// notifications/notifications.module.ts
 import { Module } from '@nestjs/common';
+import { MailModule } from '../mail/mail.module';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { NotificationsService } from './notifications.service';
-import { NotificationsController } from './notifications.controller';
-import { WhatsappModule } from 'src/whatsapp/whatsapp.module';
-import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [MailModule, WhatsappModule],

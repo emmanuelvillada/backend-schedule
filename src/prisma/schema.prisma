@@ -14,6 +14,7 @@ model User {
   password                String
   name                    String
   phone                   String?
+  whatsappOptIn Boolean   @default(false)
   avatarUrl               String?
   avatarPath              String?
   role                    Role                      @default(CLIENT)
