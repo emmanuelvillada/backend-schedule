@@ -22,8 +22,6 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RemembersModule } from './remembers/remembers.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { NotificationsResolver } from './notifications/notifications.resolver';
-import { RemembersModule } from './remembers/remembers.module';
 
 @Module({
   imports: [
@@ -63,7 +61,6 @@ import { RemembersModule } from './remembers/remembers.module';
       useClass: AllExceptionsFilter, // Filtro global de excepciones
     },
     MailService,
-    NotificationsResolver,
   ],
 })
 export class AppModule {}
